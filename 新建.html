@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>软件2446班级课程表</title>
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-upload {
+            display: flex;
+            justify-content: center;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        /* 优化文件选择按钮样式 - 更自然的边缘效果 */
+        .file-input-label {
+            display: inline-block;
+            padding: 14px 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35),
+                        0 1px 3px rgba(0, 0, 0, 0.08),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 添加微妙的内发光效果 */
+        .file-input-label::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.15), transparent 70%);
+            border-radius: inherit;
+            pointer-events: none;
+        }
+
+        /* 悬停效果优化 */
+        .file-input-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45),
+                        0 2px 4px rgba(0, 0, 0, 0.08),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        /* 点击效果 */
+        .file-input-label:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35),
+                        0 1px 2px rgba(0, 0, 0, 0.08),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .schedule-wrapper {
+            padding: 30px;
+            display: none;
+        }
+
+        .date-header {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            padding: 0 80px;
+        }
+
+        .date-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .date-item .weekday {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #5e72e4;
+            margin-bottom: 5px;
+        }
+
+        .date-item .date {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .schedule-table {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            gap: 1px;
+            background: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .time-slot {
+            background: #f8f9fa;
+            padding: 15px 10px;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #495057;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 60px;
+        }
+
+        .time-slot .period {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+
+        .time-slot .time {
+            font-size: 0.75rem;
+            color: #868e96;
+        }
+
+        .course-cell {
+            background: white;
+            padding: 8px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        /* 有课程的格子才有交互效果 */
+        .course-cell.has-course:hover {
+            transform: scale(1.02);
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 空课程格子样式 - 无交互效果 */
+        .course-cell.empty-cell {
+            background: #fafbfc;
+            cursor: default;
+        }
+
+        /* 合并的课程格子样式 */
+        .course-cell.merged-course {
+            grid-row: span var(--span-rows, 2);
+        }
+
+        /* 被合并的格子隐藏 */
+        .course-cell.merged-hidden {
+            display: none;
+        }
+
+        .course-item {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 16px 12px;
+            border-radius: 10px;
+            text-align: center;
+            width: 100%;
+            height: 100%;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 课程颜色主题 */
+        .course-item.color-1 {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .course-item.color-2 {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+
+        .course-item.color-3 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .course-item.color-4 {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+
+        .course-item.color-5 {
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        }
+
+        .course-item.color-6 {
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            color: #333;
+        }
+
+        /* 合并课程的特殊样式 */
+        .course-item.merged {
+            padding: 20px 12px;
+            font-size: 1.05rem;
+        }
+
+        .course-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .course-location {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        /* 连续课程时间显示 */
+        .course-time {
+            font-size: 0.75rem;
+            opacity: 0.85;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .schedule-table {
+                grid-template-columns: 60px repeat(7, 1fr);
+            }
+            
+            .time-slot {
+                padding: 10px 5px;
+                font-size: 0.75rem;
+            }
+            
+            .course-name {
+                font-size: 0.85rem;
+            }
+            
+            .course-location {
+                font-size: 0.7rem;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .schedule-wrapper.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        /* 波纹效果 */
+        @keyframes ripple {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        .file-input-label .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0);
+            animation: ripple 0.6s ease-out;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 软件2446班级课程表</h1>
+            <p>智能解析Excel课程表，生成美观的可视化日程</p>
+        </div>
+        
+        <div class="file-upload">
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <label for="fileInput" class="file-input-label" id="fileInputLabel">
+                    📂 选择课程表文件 (.xlsx)
+                </label>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading" style="display: none;">
+            ⏳ 正在解析课程表数据...
+        </div>
+        
+        <div class="schedule-wrapper" id="scheduleWrapper">
+            <div class="date-header" id="dateHeader">
+                <!-- 日期信息将在这里动态生成 -->
+            </div>
+            <div class="schedule-table" id="scheduleTable">
+                <!-- 课程表将在这里动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 定义课程时间段
+        const timePeriods = [
+            { period: '第1节', time: '8:00-8:45' },
+            { period: '第2节', time: '8:55-9:40' },
+            { period: '第3节', time: '10:00-10:45' },
+            { period: '第4节', time: '10:55-11:40' },
+            { period: '第5节', time: '14:30-15:15' },
+            { period: '第6节', time: '15:25-16:10' },
+            { period: '第7节', time: '16:25-17:10' },
+            { period: '第8节', time: '17:15-18:00' },
+            { period: '第9-10节', time: '19:15-20:45' }
+        ];
+
+        // 星期对应关系
+        const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+        // 颜色分配映射
+        const courseColors = new Map();
+        let colorIndex = 0;
+
+        // 添加点击波纹效果
+        document.getElementById('fileInputLabel').addEventListener('click', function(e) {
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            const rect = this.getBoundingClientRect();
+            const size = 20;
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+            ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+            this.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        });
+
+        // 文件输入处理
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('scheduleWrapper').classList.remove('show');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    processScheduleData(jsonData);
+                } catch (error) {
+                    console.error('解析文件出错:', error);
+                    alert('文件解析失败，请确保是有效的Excel文件');
+                } finally {
+                    document.getElementById('loading').style.display = 'none';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processScheduleData(data) {
+            // 获取列索引（从0开始）
+            const colF = 5;  // F列
+            const colG = 6;  // G列 - 课程名称
+            const colJ = 9;  // J列 - 星期
+            const colK = 10; // K列 - 节次
+            const colM = 12; // M列 - 上课场地
+            const colQ = 16; // Q列 - 日期
+
+            // 筛选包含"软件2446"的行
+            const filteredData = data.filter(row => {
+                return row[colF] && String(row[colF]).includes('软件2446');
+            });
+
+            if (filteredData.length === 0) {
+                alert('未找到软件2446班级的课程数据');
+                return;
+            }
+
+            // 解析课程数据
+            const courses = [];
+            const dateMap = new Map(); // 星期对应的日期
+
+            filteredData.forEach(row => {
+                const weekday = parseInt(row[colJ]);
+                const date = row[colQ];
+                const periodStr = row[colK];
+                const courseName = row[colG];
+                const location = row[colM];
+
+                if (weekday && date && periodStr && courseName) {
+                    // 记录星期对应的日期
+                    if (!dateMap.has(weekday)) {
+                        dateMap.set(weekday, formatDate(date));
+                    }
+
+                    // 解析节次
+                    const periods = parsePeriods(periodStr);
+                    
+                    courses.push({
+                        weekday: weekday,
+                        periods: periods,
+                        courseName: courseName,
+                        location: location || '未指定'
+                    });
+                }
+            });
+
+            // 生成课程表
+            generateSchedule(courses, dateMap);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return `${date.getMonth() + 1}月${date.getDate()}日`;
+        }
+
+        function parsePeriods(periodStr) {
+            // 解析如 "1-2节" 或 "5节" 的格式
+            const match = periodStr.match(/(\d+)(?:-(\d+))?/);
+            if (match) {
+                const start = parseInt(match[1]);
+                const end = match[2] ? parseInt(match[2]) : start;
+                return { start, end };
+            }
+            return { start: 1, end: 1 };
+        }
+
+        function generateSchedule(courses, dateMap) {
+            // 生成日期头部
+            const dateHeader = document.getElementById('dateHeader');
+            dateHeader.innerHTML = '';
+            
+            for (let i = 1; i <= 7; i++) {
+                const dateItem = document.createElement('div');
+                dateItem.className = 'date-item';
+                dateItem.innerHTML = `
+                    <div class="weekday">${weekDays[i - 1]}</div>
+                    <div class="date">${dateMap.get(i) || ''}</div>
+                `;
+                dateHeader.appendChild(dateItem);
+            }
+
+            // 生成课程表格
+            const scheduleTable = document.getElementById('scheduleTable');
+            scheduleTable.innerHTML = '';
+
+            // 添加时间列
+            const emptyCorner = document.createElement('div');
+            emptyCorner.className = 'time-slot';
+            emptyCorner.innerHTML = '<span style="color: #6c757d;">时间</span>';
+            scheduleTable.appendChild(emptyCorner);
+
+            // 添加星期标题（已在dateHeader中显示，这里留空）
+            for (let i = 1; i <= 7; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'course-cell empty-cell';
+                scheduleTable.appendChild(empty);
+            }
+
+            // 创建课程数据矩阵和合并信息
+            const courseMatrix = Array(9).fill(null).map(() => Array(7).fill(null));
+            const mergedCells = Array(9).fill(null).map(() => Array(7).fill(false));
+            
+            // 填充课程数据并标记需要合并的格子
+            courses.forEach(course => {
+                const weekIndex = course.weekday - 1;
+                const startPeriod = course.periods.start - 1;
+                const endPeriod = course.periods.end - 1;
+                
+                // 处理9-10节特殊情况
+                if (startPeriod >= 8) {
+                    courseMatrix[8][weekIndex] = course;
+                } else {
+                    // 标记连续课程
+                    for (let p = startPeriod; p <= endPeriod && p < 9; p++) {
+                        if (p === startPeriod) {
+                            courseMatrix[p][weekIndex] = {
+                                ...course,
+                                isMerged: endPeriod > startPeriod,
+                                spanRows: endPeriod - startPeriod + 1
+                            };
+                        } else {
+                            mergedCells[p][weekIndex] = true;
+                        }
+                    }
+                }
+            });
+
+            // 生成课程表格子
+            for (let period = 0; period < 9; period++) {
+                // 时间槽
+                const timeSlot = document.createElement('div');
+                timeSlot.className = 'time-slot';
+                
+                timeSlot.innerHTML = `
+                    <div class="period">${timePeriods[period].period}</div>
+                    <div class="time">${timePeriods[period].time}</div>
+                `;
+                scheduleTable.appendChild(timeSlot);
+
+                // 每天的课程
+                for (let day = 0; day < 7; day++) {
+                    // 如果这个格子被上面的课程合并了，跳过
+                    if (mergedCells[period][day]) {
+                        continue;
+                    }
+
+                    const courseCell = document.createElement('div');
+                    courseCell.className = 'course-cell';
+                    
+                    const course = courseMatrix[period][day];
+                    if (course) {
+                        courseCell.classList.add('has-course');
+                        
+                        // 如果是合并的课程，设置跨行
+                        if (course.isMerged) {
+                            courseCell.classList.add('merged-course');
+                            courseCell.style.setProperty('--span-rows', course.spanRows);
+                        }
+                        
+                        // 为课程分配颜色
+                        if (!courseColors.has(course.courseName)) {
+                            courseColors.set(course.courseName, (colorIndex++ % 6) + 1);
+                        }
+                        
+                        const courseItem = document.createElement('div');
+                        courseItem.className = `course-item color-${courseColors.get(course.courseName)}`;
+                        if (course.isMerged) {
+                            courseItem.classList.add('merged');
+                        }
+                        
+                        // 生成课程内容
+                        let courseContent = `
+                            <div class="course-name">${course.courseName}</div>
+                            <div class="course-location">📍 ${course.location}</div>
+                        `;
+                        
+                        // 如果是连续课程，添加时间信息
+                        if (course.isMerged) {
+                            const startTime = timePeriods[period].time.split('-')[0];
+                            const endPeriodIndex = Math.min(period + course.spanRows - 1, 8);
+                            const endTime = timePeriods[endPeriodIndex].time.split('-')[1];
+                            courseContent += `<div class="course-time">🕐 ${startTime} - ${endTime}</div>`;
+                        }
+                        
+                        courseItem.innerHTML = courseContent;
+                        courseCell.appendChild(courseItem);
+                    } else {
+                        courseCell.classList.add('empty-cell');
+                    }
+                    
+                    scheduleTable.appendChild(courseCell);
+                }
+            }
+
+            // 显示课程表
+            document.getElementById('scheduleWrapper').classList.add('show');
+        }
+    </script>
+</body>
+</html>
