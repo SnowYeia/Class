@@ -225,12 +225,14 @@
 
         /* 课程表容器 */
         .schedule-container {
-            display: none;
-            animation: fadeIn var(--duration-normal) ease;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .schedule-container.active {
-            display: block;
+            opacity: 1;
+            transform: translateY(0);
         }
 
         @keyframes fadeIn {
@@ -250,7 +252,9 @@
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: 12px;
-            padding-left: 60px;
+            padding-left: 80px;
+            align-items: center;
+            min-height: 50px;
         }
 
         @media (max-width: 768px) {
@@ -261,6 +265,10 @@
 
         .date-item {
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .date-weekday {
@@ -281,6 +289,14 @@
             border-radius: 16px;
             overflow: hidden;
             box-shadow: var(--shadow-md);
+            opacity: 0;
+            transform: scale(0.98);
+            transition: all var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .schedule-wrapper.show {
+            opacity: 1;
+            transform: scale(1);
         }
 
         @media (max-width: 768px) {
@@ -295,6 +311,7 @@
 
         .schedule-scroll {
             overflow-x: auto;
+            overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
         }
@@ -305,13 +322,13 @@
 
         .schedule-grid {
             display: grid;
-            grid-template-columns: 60px repeat(7, minmax(120px, 1fr));
+            grid-template-columns: min-content repeat(7, minmax(140px, 1fr));
             min-width: 100%;
         }
 
         @media (max-width: 768px) {
             .schedule-grid {
-                grid-template-columns: 60px repeat(7, 110px);
+                grid-template-columns: min-content repeat(7, minmax(120px, max-content));
                 width: max-content;
             }
         }
@@ -319,13 +336,15 @@
         /* 时间列 */
         .time-slot {
             background-color: var(--warm-white);
-            padding: 12px 8px;
+            padding: 12px 12px;
             text-align: center;
             border-right: 0.5px solid var(--separator);
             border-bottom: 0.5px solid var(--separator);
             position: sticky;
             left: 0;
             z-index: 10;
+            white-space: nowrap;
+            min-width: 80px;
         }
 
         .time-period {
@@ -341,18 +360,30 @@
             font-size: 10px;
             color: var(--text-tertiary);
             font-variant-numeric: tabular-nums;
+            white-space: nowrap;
         }
 
         /* 星期标题（移动端） */
         .weekday-header {
             background-color: var(--warm-white);
-            padding: 8px;
+            padding: 10px 12px;
             text-align: center;
             border-right: 0.5px solid var(--separator);
             border-bottom: 0.5px solid var(--separator);
             font-size: 13px;
             font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .weekday-header .date {
+            font-size: 11px;
             color: var(--text-secondary);
+            font-weight: normal;
         }
 
         /* 课程单元格 */
@@ -374,6 +405,12 @@
             grid-row: span var(--row-span, 2);
         }
 
+        .course-cell.empty-header {
+            background-color: var(--warm-white);
+            min-height: auto;
+            padding: 16px 8px;
+        }
+
         /* 课程卡片 */
         .course-card {
             background-color: var(--accent);
@@ -391,6 +428,17 @@
             position: relative;
             cursor: pointer;
             transition: all var(--duration-fast) ease;
+            animation: courseCardIn var(--duration-normal) ease forwards;
+            animation-delay: var(--animation-delay, 0ms);
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        @keyframes courseCardIn {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .course-card:hover {
@@ -432,6 +480,7 @@
             font-size: 9px;
             opacity: 0.8;
             font-variant-numeric: tabular-nums;
+            white-space: nowrap;
         }
 
         /* 教师提示 */
@@ -485,6 +534,14 @@
             font-size: 13px;
             box-shadow: var(--shadow-lg);
             animation: slideUp var(--duration-normal) ease;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all var(--duration-normal) ease;
+        }
+
+        .scroll-indicator.show {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         @media (max-width: 768px) {
@@ -505,7 +562,8 @@
         }
 
         .scroll-indicator.hidden {
-            display: none;
+            opacity: 0;
+            transform: translateY(20px);
         }
     </style>
 </head>
@@ -548,7 +606,7 @@
                 <div class="date-header" id="dateHeader"></div>
                 
                 <!-- 课程表 -->
-                <div class="schedule-wrapper">
+                <div class="schedule-wrapper" id="scheduleWrapper">
                     <div class="schedule-scroll">
                         <div class="schedule-grid" id="scheduleGrid"></div>
                     </div>
@@ -729,7 +787,7 @@
 
         // 渲染课程表
         function renderSchedule(courses, dateMap) {
-            // 渲染日期标题
+            // 渲染日期标题（桌面端）
             const dateHeader = document.getElementById('dateHeader');
             dateHeader.innerHTML = '';
             
@@ -777,27 +835,32 @@
             // 添加空角
             const corner = document.createElement('div');
             corner.className = 'time-slot';
+            corner.style.borderBottom = '0.5px solid var(--separator)';
             grid.appendChild(corner);
             
-            // 添加星期标题（移动端）
+            // 添加星期标题
             if (window.innerWidth <= 768) {
+                // 移动端显示星期和日期
                 for (let i = 0; i < 7; i++) {
                     const header = document.createElement('div');
                     header.className = 'weekday-header';
-                    header.textContent = WEEKDAYS[i];
+                    header.innerHTML = `
+                        <div>${WEEKDAYS[i]}</div>
+                        <div class="date">${dateMap.get(i + 1) || ''}</div>
+                    `;
                     grid.appendChild(header);
                 }
             } else {
-                // 桌面端空白
+                // 桌面端空白格子
                 for (let i = 0; i < 7; i++) {
                     const empty = document.createElement('div');
-                    empty.style.borderBottom = '0.5px solid var(--separator)';
-                    empty.style.borderRight = '0.5px solid var(--separator)';
+                    empty.className = 'course-cell empty-header';
                     grid.appendChild(empty);
                 }
             }
             
             // 渲染课程格子
+            let animationDelay = 0;
             for (let row = 0; row < 9; row++) {
                 // 时间列
                 const timeSlot = document.createElement('div');
@@ -829,6 +892,8 @@
                         
                         const card = document.createElement('div');
                         card.className = `course-card color-${courseColorMap.get(course.name)}`;
+                        card.style.setProperty('--animation-delay', `${animationDelay}ms`);
+                        animationDelay += 30;
                         
                         // 计算时间范围
                         let timeRange = '';
@@ -856,15 +921,22 @@
                 }
             }
             
-            // 显示课程表
-            document.getElementById('scheduleContainer').classList.add('active');
+            // 显示课程表容器
+            setTimeout(() => {
+                document.getElementById('scheduleContainer').classList.add('active');
+                
+                // 延迟显示课程表动画
+                setTimeout(() => {
+                    document.getElementById('scheduleWrapper').classList.add('show');
+                }, 100);
+            }, 200);
             
             // 移动端滚动提示
             if (window.innerWidth <= 768) {
                 const scrollIndicator = document.getElementById('scrollIndicator');
                 setTimeout(() => {
-                    scrollIndicator.classList.remove('hidden');
-                }, 500);
+                    scrollIndicator.classList.add('show');
+                }, 800);
                 
                 // 滚动后隐藏提示
                 document.querySelector('.schedule-scroll').addEventListener('scroll', function() {
