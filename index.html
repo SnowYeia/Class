@@ -873,7 +873,7 @@
                 const timeSlot = document.createElement('div');
                 timeSlot.className = 'time-slot';
                 timeSlot.innerHTML = `
-                    <div class="time-period">${TIME_SLOTS[row].period}节</div>
+                    <div class="time-period">第${TIME_SLOTS[row].period}节</div>
                     <div class="time-range">${TIME_SLOTS[row].time}</div>
                 `;
                 grid.appendChild(timeSlot);
