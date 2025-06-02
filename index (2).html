@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课程日程表 - 软件2446</title>
+    <script src="xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #fdfcfb; /* 暖白色背景 */
+            --card-bg-color: #ffffff;
+            --text-color-primary: #333333;
+            --text-color-secondary: #555555;
+            --text-color-tertiary: #888888;
+            --border-color: #eeeeee;
+            --accent-color: #007aff; /* iOS Blue */
+            --shadow-color: rgba(0, 0, 0, 0.08);
+            --header-height: 60px;
+            --time-slot-width: 100px;
+            --time-slot-base-height: 60px; /* Standard height for one period slot */
+            --time-slot-double-height: 120px; /* Height for 9-10 period slot */
+            --capsule-bg-color: #eaf6ff;
+            --capsule-text-color: #005fbb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color-primary);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .file-selector {
+            margin-bottom: 25px;
+            padding: 12px 20px;
+            background-color: var(--card-bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--accent-color);
+            transition: all 0.2s ease-in-out;
+        }
+        .file-selector:hover {
+            background-color: #f0f0f0;
+            transform: translateY(-2px);
+        }
+        input[type="file"] {
+            display: none;
+        }
+
+        #timetable-container {
+            width: 100%;
+            max-width: 1400px;
+            background-color: var(--card-bg-color);
+            border-radius: 16px;
+            box-shadow: 0 8px 25px var(--shadow-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .timetable-header {
+            padding: 18px 25px;
+            background-color: #f7f7f7;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .timetable-header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .timetable-header p {
+            margin: 5px 0 0;
+            font-size: 14px;
+            color: var(--text-color-secondary);
+        }
+
+        .timetable-body {
+            display: flex;
+            flex-grow: 1;
+        }
+
+        .time-slots-column {
+            flex: 0 0 var(--time-slot-width);
+            padding-top: 50px; /* Align with day headers */
+            border-right: 1px solid var(--border-color);
+        }
+
+        .time-slot {
+            /* height is now set by JS based on --time-slot-base-height or --time-slot-double-height */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            box-sizing: border-box;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-color-tertiary);
+            text-align: center;
+        }
+        .time-slot:last-child { border-bottom: none; }
+        /* .double class is still used as a marker, but height is set via style property in JS */
+
+
+        .days-container {
+            display: flex;
+            flex-grow: 1;
+            overflow-x: auto;
+        }
+
+        .day-column {
+            flex: 1 1 0;
+            min-width: 180px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .day-column:last-child { border-right: none; }
+
+        .day-header {
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            background-color: #f9f9f9;
+            border-bottom: 1px solid var(--border-color);
+            padding: 5px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+        .day-header .day-name { color: var(--text-color-primary); }
+        .day-header .day-date { font-size: 12px; color: var(--text-color-secondary); }
+
+        .courses-grid {
+            position: relative;
+            flex-grow: 1;
+        }
+         .no-course-message {
+            text-align: center;
+            margin-top: 30px;
+            color: var(--text-color-tertiary);
+            font-size: 14px;
+            padding: 0 10px;
+        }
+
+        .course-item {
+            position: absolute;
+            left: 5px;
+            right: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            font-size: 13px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: default;
+        }
+        .course-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .course-name {
+            font-weight: 600;
+            color: var(--text-color-primary);
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        .course-location {
+            font-size: 12px;
+            color: var(--text-color-secondary);
+            margin-bottom: 2px;
+        }
+        .course-time {
+            font-size: 11px;
+            color: var(--capsule-text-color);
+            background-color: var(--capsule-bg-color);
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .teacher-tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.9);
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            white-space: nowrap;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+        }
+        .teacher-tooltip.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .time-slots-column { flex: 0 0 80px; }
+            .day-column { min-width: 150px; }
+            .course-item { font-size: 11px; }
+            .course-name { font-size: 12px; }
+            .course-location, .course-time { font-size: 10px; }
+            .course-time { padding: 2px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+    <label for="fileInput" class="file-selector">选择课程表文件 (.xlsx)</label>
+    <input type="file" id="fileInput" accept=".xlsx, .xls">
+
+    <div id="timetable-container" style="display: none;">
+        <div class="timetable-header">
+            <h1 id="main-title">课程日程表 - 软件2446</h1>
+            <p id="week-dates-info"></p>
+        </div>
+        <div class="timetable-body">
+            <div class="time-slots-column" id="time-slots-column"></div>
+            <div class="days-container" id="days-container"></div>
+        </div>
+    </div>
+    <p id="no-data-message" style="display: none; color: var(--text-color-secondary);">未找到符合条件的课程数据，或文件未选择。</p>
+
+    <div id="teacherTooltip" class="teacher-tooltip"></div>
+
+    <script>
+        const CLASS_FILTER_KEYWORD = "软件2446";
+        const COLUMN_CLASS_FILTER = 'F';
+        const COLUMN_DAY_OF_WEEK = 'J'; // 星期几 (1-7)
+        const COLUMN_COURSE_DATE = 'Q';  // 课程当天的日期 (重要变更: 假设Q列是课程发生的具体日期)
+        const COLUMN_SESSION = 'K';     // 节次 (e.g., "1-2节")
+        const COLUMN_COURSE_NAME = 'G';
+        const COLUMN_LOCATION = 'M';
+        const COLUMN_TEACHER = 'E';
+
+        // Defines visual time slots on the left and their properties
+        const PERIOD_TIMES_DISPLAY = [
+            { period_label: "1", time: "8:00-8:45", display_label: "第1节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "2", time: "8:55-9:40", display_label: "第2节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "3", time: "10:00-10:45", display_label: "第3节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "4", time: "10:55-11:40", display_label: "第4节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "5", time: "14:30-15:15", display_label: "第5节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "6", time: "15:25-16:10", display_label: "第6节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "7", time: "16:25-17:10", display_label: "第7节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "8", time: "17:15-18:00", display_label: "第8节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
+            { period_label: "9-10", time: "19:15-20:45", display_label: "第9-10节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-double-height')) || 90 }
+        ];
+        // Mapping actual course periods (1-10) to their corresponding display slot index in PERIOD_TIMES_DISPLAY
+        const PERIOD_TO_DISPLAY_SLOT_INDEX = {
+            1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 8 // Periods 9 and 10 map to the last display slot
+        };
+
+
+        const tooltipElement = document.getElementById('teacherTooltip');
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                processAndRenderTimetable(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function getColumnIndex(colLetter) {
+            return colLetter.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+        }
+
+        function parseSession(sessionStr) {
+            if (!sessionStr || typeof sessionStr !== 'string') return null;
+            const match = sessionStr.match(/(\d+)-?(\d*)/);
+            if (match) {
+                const start = parseInt(match[1]);
+                const end = match[2] ? parseInt(match[2]) : start;
+                return { startPeriod: start, endPeriod: end }; // Actual periods 1-10
+            }
+            return null;
+        }
+        
+        function excelSerialDateToJSDate(serial) {
+            const utc_days  = Math.floor(serial - 25569);
+            const utc_value = utc_days * 86400;                                        
+            const date_info = new Date(utc_value * 1000);
+            const fractional_day = serial - Math.floor(serial) + 0.0000001;
+            let total_seconds = Math.floor(86400 * fractional_day);
+            const seconds = total_seconds % 60;
+            total_seconds -= seconds;
+            const hours = Math.floor(total_seconds / (60 * 60));
+            const minutes = Math.floor(total_seconds / 60) % 60;
+            return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+        }
+
+        function processAndRenderTimetable(rawData) {
+            const coursesByDay = {}; // Key: "YYYY-MM-DD", Value: { dateObj: Date, courses: [] }
+            let overallMinDate = null;
+            let overallMaxDate = null;
+            let actualDataFound = false;
+
+            const colIdx = {
+                filter: getColumnIndex(COLUMN_CLASS_FILTER),
+                dayOfWeek: getColumnIndex(COLUMN_DAY_OF_WEEK),
+                courseDate: getColumnIndex(COLUMN_COURSE_DATE), // Q column for course's actual date
+                session: getColumnIndex(COLUMN_SESSION),
+                courseName: getColumnIndex(COLUMN_COURSE_NAME),
+                location: getColumnIndex(COLUMN_LOCATION),
+                teacher: getColumnIndex(COLUMN_TEACHER)
+            };
+            
+            const dataStartIndex = (rawData.length > 0 && typeof rawData[0][colIdx.filter] === 'string' && isNaN(parseInt(rawData[0][colIdx.dayOfWeek]))) ? 1 : 0;
+
+            for (let i = dataStartIndex; i < rawData.length; i++) {
+                const row = rawData[i];
+                if (!row || row.length === 0) continue;
+
+                const filterCell = row[colIdx.filter] ? String(row[colIdx.filter]) : "";
+
+                if (filterCell.includes(CLASS_FILTER_KEYWORD)) {
+                    const dayOfWeekValue = parseInt(row[colIdx.dayOfWeek]); // From J column
+                    let courseDateCell = row[colIdx.courseDate]; // From Q column
+                    
+                    let currentCourseDate;
+                    if (typeof courseDateCell === 'number') { // Excel date serial number
+                        currentCourseDate = excelSerialDateToJSDate(courseDateCell);
+                    } else if (typeof courseDateCell === 'string') { // Date string "YYYY-MM-DD" or "YYYY/MM/DD"
+                        currentCourseDate = new Date(courseDateCell.replace(/-/g, '/'));
+                    } else {
+                        console.warn("Invalid date format in Q column for row:", row, courseDateCell);
+                        continue;
+                    }
+
+                    if (isNaN(currentCourseDate.getTime())) {
+                        console.warn("Could not parse course date:", courseDateCell, "in row:", row);
+                        continue;
+                    }
+                    currentCourseDate.setHours(0,0,0,0); // Normalize time part for consistent grouping by day
+
+                    // Track overall min/max date for timetable range
+                    if (!overallMinDate || currentCourseDate < overallMinDate) overallMinDate = new Date(currentCourseDate);
+                    if (!overallMaxDate || currentCourseDate > overallMaxDate) overallMaxDate = new Date(currentCourseDate);
+                    
+                    // Use YYYY-MM-DD for keys to ensure uniqueness across years and correct sorting
+                    const dateKey = `${currentCourseDate.getFullYear()}-${String(currentCourseDate.getMonth() + 1).padStart(2, '0')}-${String(currentCourseDate.getDate()).padStart(2, '0')}`;
+                    
+                    const sessionInfo = parseSession(String(row[colIdx.session]));
+                    if (!sessionInfo) {
+                         console.warn("Could not parse session:", row[colIdx.session], "in row:", row);
+                        continue;
+                    }
+
+                    const course = {
+                        name: String(row[colIdx.courseName] || "未知课程"),
+                        location: String(row[colIdx.location] || "地点待定"),
+                        teacher: String(row[colIdx.teacher] || "未知教师"),
+                        dayOfWeek: dayOfWeekValue, // Store original J column value
+                        dateObj: new Date(currentCourseDate), // Store full date object for this course
+                        dateKey: dateKey, // YYYY-MM-DD
+                        ...sessionInfo, // startPeriod, endPeriod (actual 1-10)
+                    };
+
+                    if (!coursesByDay[dateKey]) {
+                        coursesByDay[dateKey] = {
+                            dateObj: new Date(currentCourseDate), // Store a clean date obj for the day
+                            courses: []
+                        };
+                    }
+                    coursesByDay[dateKey].courses.push(course);
+                    actualDataFound = true;
+                }
+            }
+            
+            const noDataMsg = document.getElementById('no-data-message');
+            const timetableCont = document.getElementById('timetable-container');
+
+            if (!actualDataFound) {
+                timetableCont.style.display = 'none';
+                noDataMsg.style.display = 'block';
+                noDataMsg.textContent = `未在文件中找到含有 "${CLASS_FILTER_KEYWORD}" 的课程数据。`;
+                return;
+            }
+            noDataMsg.style.display = 'none';
+            timetableCont.style.display = 'flex';
+            
+            if (overallMinDate && overallMaxDate) {
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                 document.getElementById('week-dates-info').textContent = 
+                    `${overallMinDate.toLocaleDateString('zh-CN', options)} 至 ${overallMaxDate.toLocaleDateString('zh-CN', options)}`;
+            } else {
+                 document.getElementById('week-dates-info').textContent = "日期范围未知";
+            }
+
+            renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate);
+        }
+
+        function renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate) {
+            const timeSlotsColumn = document.getElementById('time-slots-column');
+            const daysContainer = document.getElementById('days-container');
+            timeSlotsColumn.innerHTML = '';
+            daysContainer.innerHTML = '';
+
+            // 1. Render Time Slots (Left Column)
+            PERIOD_TIMES_DISPLAY.forEach(slot => {
+                const slotDiv = document.createElement('div');
+                slotDiv.classList.add('time-slot');
+                slotDiv.style.height = `${slot.height}px`; // Explicitly set height
+                if (slot.period_label === "9-10") slotDiv.classList.add('double'); // Keep for potential specific styling if needed
+
+                slotDiv.innerHTML = `<p style="margin:2px 0;">${slot.time}</p>
+                                     <p style="margin:2px 0; font-size:11px;">${slot.display_label}</p>`;
+                timeSlotsColumn.appendChild(slotDiv);
+            });
+
+            // 2. Prepare all dates to display (including days with no courses)
+            const allDisplayDates = [];
+            if (overallMinDate && overallMaxDate) {
+                let currentDateIter = new Date(overallMinDate);
+                currentDateIter.setHours(0,0,0,0);
+                const lastDateToDisplay = new Date(overallMaxDate);
+                lastDateToDisplay.setHours(0,0,0,0);
+
+                while (currentDateIter <= lastDateToDisplay) {
+                    allDisplayDates.push(new Date(currentDateIter));
+                    currentDateIter.setDate(currentDateIter.getDate() + 1);
+                }
+            } else { // Fallback if no courses found, but should be caught by actualDataFound
+                return;
+            }
+
+            // 3. Render Day Columns and Courses
+            const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]; // JS getDay() mapping
+
+            allDisplayDates.forEach(currentDisplayDate => {
+                const dateKey = `${currentDisplayDate.getFullYear()}-${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
+                const displayDateString = `${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
+                
+                const dayColumn = document.createElement('div');
+                dayColumn.classList.add('day-column');
+
+                const dayHeader = document.createElement('div');
+                dayHeader.classList.add('day-header');
+                const dayNameSpan = document.createElement('span');
+                dayNameSpan.classList.add('day-name');
+                // Use JS Date.getDay() for reliable day name, not J column directly for header
+                dayNameSpan.textContent = dayNames[currentDisplayDate.getDay()]; 
+                const dayDateSpan = document.createElement('span');
+                dayDateSpan.classList.add('day-date');
+                dayDateSpan.textContent = displayDateString;
+                
+                dayHeader.appendChild(dayNameSpan);
+                dayHeader.appendChild(dayDateSpan);
+                dayColumn.appendChild(dayHeader);
+
+                const coursesGrid = document.createElement('div');
+                coursesGrid.classList.add('courses-grid');
+                
+                if (coursesByDay[dateKey] && coursesByDay[dateKey].courses.length > 0) {
+                    const dayData = coursesByDay[dateKey];
+                    dayData.courses.sort((a, b) => a.startPeriod - b.startPeriod);
+
+                    dayData.courses.forEach(course => {
+                        const courseItem = document.createElement('div');
+                        courseItem.classList.add('course-item');
+
+                        // Calculate top offset based on the start period's visual slot
+                        let topOffset = 0;
+                        const startVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod];
+                        for (let i = 0; i < startVisualSlotIndex; i++) {
+                            topOffset += PERIOD_TIMES_DISPLAY[i].height;
+                        }
+                        courseItem.style.top = `${topOffset}px`;
+
+                        // Calculate height based on periods spanned
+                        let courseCardHeight = 0;
+                        const endVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod];
+                        for (let i = startVisualSlotIndex; i <= endVisualSlotIndex; i++) {
+                            courseCardHeight += PERIOD_TIMES_DISPLAY[i].height;
+                        }
+                        courseItem.style.height = `${courseCardHeight - 10}px`; // -10 for padding & visual gap
+
+                        const courseNameDiv = document.createElement('div');
+                        courseNameDiv.classList.add('course-name');
+                        courseNameDiv.textContent = course.name;
+
+                        const courseLocationDiv = document.createElement('div');
+                        courseLocationDiv.classList.add('course-location');
+                        courseLocationDiv.textContent = `📍 ${course.location}`;
+                        
+                        const courseTimeDiv = document.createElement('div');
+                        courseTimeDiv.classList.add('course-time');
+                        // Get time string from PERIOD_TIMES_DISPLAY based on actual start/end periods
+                        const startTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod]];
+                        const endTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod]];
+                        let timeStr = `节次 ${course.startPeriod}-${course.endPeriod}`;
+
+                        if (startTimeInfo && endTimeInfo) {
+                            const actualStartT = startTimeInfo.time.split('-')[0];
+                            let actualEndT = endTimeInfo.time.split('-')[1];
+                            // Special case for 9-10, use the combined slot's end time
+                            if (course.startPeriod >=9 && course.endPeriod >=9 && course.startPeriod <= course.endPeriod) {
+                                actualEndT = PERIOD_TIMES_DISPLAY[8].time.split('-')[1]; // 9-10 slot
+                            }
+                             timeStr = `${actualStartT} - ${actualEndT}`;
+                        }
+                        courseTimeDiv.innerHTML = `🕘 ${timeStr}`;
+
+                        courseItem.appendChild(courseNameDiv);
+                        courseItem.appendChild(courseLocationDiv);
+                        courseItem.appendChild(courseTimeDiv);
+                        
+                        courseItem.addEventListener('mouseenter', (event) => {
+                            tooltipElement.textContent = `教师：${course.teacher || '未知'}`;
+                            const itemRect = courseItem.getBoundingClientRect();
+                            const tooltipRect = tooltipElement.getBoundingClientRect();
+                            let top = itemRect.top + window.scrollY;
+                            let left = itemRect.right + 8 + window.scrollX;
+                            if (left + tooltipRect.width > window.innerWidth) {
+                                left = itemRect.left - tooltipRect.width - 8 + window.scrollX;
+                            }
+                            if (top + tooltipRect.height > window.innerHeight + window.scrollY) {
+                               top = itemRect.bottom - tooltipRect.height + window.scrollY;
+                            }
+                            if (top < window.scrollY) top = window.scrollY + 5;
+                            tooltipElement.style.top = `${top}px`;
+                            tooltipElement.style.left = `${left}px`;
+                            tooltipElement.classList.add('visible');
+                        });
+                        courseItem.addEventListener('mouseleave', () => {
+                            tooltipElement.classList.remove('visible');
+                        });
+                        coursesGrid.appendChild(courseItem);
+                    });
+                } else {
+                    // This day has no courses, display message
+                    const noCourseMsg = document.createElement('p');
+                    noCourseMsg.classList.add('no-course-message');
+                    noCourseMsg.textContent = "今日无课";
+                    coursesGrid.appendChild(noCourseMsg);
+                }
+                dayColumn.appendChild(coursesGrid);
+                daysContainer.appendChild(dayColumn);
+            });
+        }
+        
+        document.getElementById('no-data-message').style.display = 'block';
+        document.getElementById('no-data-message').textContent = '请选择一个课程表XLSX文件以上传。';
+
+    </script>
+</body>
+</html>
