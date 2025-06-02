@@ -33,28 +33,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            overflow-x: hidden; /* Prevent horizontal scrollbar during initial animations if any */
+            overflow-x: hidden; 
         }
 
-        .file-selector {
-            margin-bottom: 25px;
-            padding: 12px 20px;
-            background-color: var(--card-bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            box-shadow: 0 4px 12px var(--shadow-color);
-            cursor: pointer;
-            font-size: 16px;
-            color: var(--accent-color);
-            transition: all 0.2s ease-in-out;
-        }
-        .file-selector:hover {
-            background-color: #f0f0f0;
-            transform: translateY(-2px);
-        }
-        input[type="file"] {
-            display: none;
-        }
+        /* File selector removed */
 
         #timetable-container {
             width: 100%;
@@ -73,7 +55,6 @@
             opacity: 1;
             transform: translateY(0);
         }
-
 
         .timetable-header {
             padding: 18px 25px;
@@ -124,7 +105,6 @@
             transform: translateY(0);
         }
 
-
         .day-header {
             height: 50px;
             display: flex;
@@ -168,15 +148,13 @@
             transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .course-item:hover {
-            /* Ensure hover transform is relative to final animated state */
-            transform: translateY(-2px) scale(1.02) !important; /* Use !important if fighting with animation final state */
+            transform: translateY(-2px) scale(1.02) !important;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         .course-item.visible {
             opacity: 1;
             transform: scale(1) translateY(0);
         }
-
 
         .course-name { font-weight: 600; color: var(--text-color-primary); margin-bottom: 4px; font-size: 14px; }
         .course-location { font-size: 12px; color: var(--text-color-secondary); margin-bottom: 2px; }
@@ -219,10 +197,7 @@
     </style>
 </head>
 <body>
-
-    <label for="fileInput" class="file-selector">选择课程表文件 (.xlsx)</label>
-    <input type="file" id="fileInput" accept=".xlsx, .xls">
-
+    <!-- File input removed -->
     <div id="timetable-container"> 
         <div class="timetable-header">
             <h1 id="main-title">课程日程表 - 软件2446</h1>
@@ -233,12 +208,15 @@
             <div class="days-container" id="days-container"></div>
         </div>
     </div>
-    <p id="no-data-message" style="display: none; color: var(--text-color-secondary);">未找到符合条件的课程数据，或文件未选择。</p>
+    <p id="no-data-message" style="display: none; color: var(--text-color-secondary); text-align: center; margin-top: 30px;">
+        <!-- Message will be set by JavaScript -->
+    </p>
 
     <div id="teacherTooltip" class="teacher-tooltip"></div>
 
     <script>
         const CLASS_FILTER_KEYWORD = "软件2446";
+        const DEFAULT_TIMETABLE_FILE = "c.xlsx"; // Default file to load
         const COLUMN_CLASS_FILTER = 'F';
         const COLUMN_DAY_OF_WEEK = 'J';
         const COLUMN_COURSE_DATE = 'Q';
@@ -266,28 +244,41 @@
         const noDataMsg = document.getElementById('no-data-message');
         const tooltipElement = document.getElementById('teacherTooltip');
         
-        document.getElementById('fileInput').addEventListener('change', handleFile);
+        // Removed fileInput event listener
 
-        function handleFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        async function loadAndProcessDefaultFile() {
+            noDataMsg.textContent = `正在加载课程表 (${DEFAULT_TIMETABLE_FILE})...`;
+            noDataMsg.style.display = 'block';
+            timetableCont.classList.remove('loaded'); // Ensure hidden
+            document.getElementById('time-slots-column').innerHTML = ''; // Clear previous content
+            document.getElementById('days-container').innerHTML = '';   // Clear previous content
 
-            timetableCont.classList.remove('loaded');
-            document.getElementById('time-slots-column').innerHTML = '';
-            document.getElementById('days-container').innerHTML = '';
-            noDataMsg.style.display = 'none';
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
+            try {
+                const response = await fetch(DEFAULT_TIMETABLE_FILE);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}. 无法找到或访问 "${DEFAULT_TIMETABLE_FILE}".`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
+
+                if (!firstSheetName) {
+                    throw new Error(`文件 "${DEFAULT_TIMETABLE_FILE}" 中没有找到工作表 (sheet)。`);
+                }
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
                 processAndRenderTimetable(jsonData);
-            };
-            reader.readAsArrayBuffer(file);
+
+            } catch (error) {
+                console.error("加载默认课程表时出错:", error);
+                noDataMsg.textContent = `加载课程表 "${DEFAULT_TIMETABLE_FILE}" 失败。请确保文件在同一目录下且格式正确。详细错误: ${error.message}`;
+                noDataMsg.style.display = 'block';
+                timetableCont.classList.remove('loaded'); 
+            }
         }
+
 
         function getColumnIndex(colLetter) {
             return colLetter.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
@@ -318,6 +309,8 @@
         }
 
         function processAndRenderTimetable(rawData) {
+            // This function remains largely the same as it processes data passed to it.
+            // UI clearing for timetableCont's children is now handled before calling this by loadAndProcessDefaultFile.
             const coursesByDay = {};
             let overallMinDate = null;
             let overallMaxDate = null;
@@ -381,11 +374,11 @@
             if (!actualDataFound) {
                 timetableCont.classList.remove('loaded'); 
                 noDataMsg.style.display = 'block';
-                noDataMsg.textContent = `未在文件中找到含有 "${CLASS_FILTER_KEYWORD}" 的课程数据。`;
+                noDataMsg.textContent = `在文件 "${DEFAULT_TIMETABLE_FILE}" 中未找到 "${CLASS_FILTER_KEYWORD}" 的课程数据。`;
                 return;
             }
             
-            noDataMsg.style.display = 'none';
+            noDataMsg.style.display = 'none'; // Hide "loading" or "error" message if data is found
             
             if (overallMinDate && overallMaxDate) {
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
@@ -398,13 +391,14 @@
             renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate);
 
             setTimeout(() => {
-                timetableCont.classList.add('loaded');
+                timetableCont.classList.add('loaded'); // Trigger animation for the main container
             }, 50); 
         }
 
         function renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate) {
             const timeSlotsColumn = document.getElementById('time-slots-column');
             const daysContainer = document.getElementById('days-container');
+            // Content is already cleared by loadAndProcessDefaultFile
 
             PERIOD_TIMES_DISPLAY.forEach(slot => {
                 const slotDiv = document.createElement('div');
@@ -477,23 +471,19 @@
 
                         courseItem.appendChild(courseNameDiv); courseItem.appendChild(courseLocationDiv); courseItem.appendChild(courseTimeDiv);
                         
-                        // --- FIX: Restore Tooltip Event Listeners ---
                         courseItem.addEventListener('mouseenter', (event) => {
                             tooltipElement.textContent = `教师：${course.teacher || '未知'}`;
                             const itemRect = courseItem.getBoundingClientRect();
                             const tooltipRect = tooltipElement.getBoundingClientRect();
                             let top = itemRect.top + window.scrollY;
                             let left = itemRect.right + 8 + window.scrollX;
-
                             if (left + tooltipRect.width > window.innerWidth) {
                                 left = itemRect.left - tooltipRect.width - 8 + window.scrollX;
                             }
                             if (top + tooltipRect.height > window.innerHeight + window.scrollY) {
                                top = itemRect.bottom - tooltipRect.height + window.scrollY;
                             }
-                            if (top < window.scrollY) {
-                                top = window.scrollY + 5;
-                            }
+                            if (top < window.scrollY) { top = window.scrollY + 5; }
                             tooltipElement.style.top = `${top}px`;
                             tooltipElement.style.left = `${left}px`;
                             tooltipElement.classList.add('visible');
@@ -501,8 +491,6 @@
                         courseItem.addEventListener('mouseleave', () => {
                             tooltipElement.classList.remove('visible');
                         });
-                        // --- END FIX ---
-
                         coursesGrid.appendChild(courseItem);
                     });
                 } else {
@@ -515,6 +503,7 @@
                 daysContainer.appendChild(dayColumn);
             });
 
+            // Trigger animations for day columns and course items
             setTimeout(() => {
                 const allDayColumns = daysContainer.querySelectorAll('.day-column');
                 allDayColumns.forEach((col, dayIdx) => {
@@ -527,12 +516,12 @@
                         item.classList.add('visible');
                     });
                 });
-            }, 100); 
+            }, 100); // Delay to start after container animation has likely begun
         }
         
-        noDataMsg.style.display = 'block'; 
-        timetableCont.classList.remove('loaded'); 
-        noDataMsg.textContent = '请选择一个课程表XLSX文件以上传。';
+        // Automatically load the default timetable when the DOM is ready
+        window.addEventListener('DOMContentLoaded', loadAndProcessDefaultFile);
+
     </script>
 </body>
 </html>
