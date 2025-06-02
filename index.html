@@ -18,7 +18,7 @@
             --header-height: 60px;
             --time-slot-width: 100px;
             --time-slot-base-height: 60px;
-            --time-slot-double-height: 120px;
+            --time-slot-double-height: 90px;
             --capsule-bg-color: #eaf6ff;
             --capsule-text-color: #005fbb;
         }
@@ -63,15 +63,13 @@
             border-radius: 16px;
             box-shadow: 0 8px 25px var(--shadow-color);
             overflow: hidden;
-            display: flex; /* Set by JS, but kept here for reference */
+            display: flex; 
             flex-direction: column;
-            /* Animation: Initial state */
             opacity: 0;
             transform: translateY(20px);
             transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
         }
         #timetable-container.loaded {
-            /* Animation: Final state */
             opacity: 1;
             transform: translateY(0);
         }
@@ -116,15 +114,12 @@
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            /* Animation: Initial state */
             opacity: 0;
             transform: translateY(15px);
             transition: opacity 0.4s ease-out, transform 0.4s ease-out;
-            /* transition-delay will be set by JS */
         }
         .day-column:last-child { border-right: none; }
         .day-column.visible {
-             /* Animation: Final state */
             opacity: 1;
             transform: translateY(0);
         }
@@ -168,18 +163,16 @@
             font-size: 13px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             cursor: default;
-            /* Animation: Initial state */
             opacity: 0;
-            transform: scale(0.95) translateY(5px); /* Slight scale and Y offset */
-            transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* easeOutBack like */
-            /* transition-delay will be set by JS */
+            transform: scale(0.95) translateY(5px); 
+            transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         .course-item:hover {
-            transform: translateY(-2px) scale(1.02); /* Keep hover effect, adjust base transform if needed */
+            /* Ensure hover transform is relative to final animated state */
+            transform: translateY(-2px) scale(1.02) !important; /* Use !important if fighting with animation final state */
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         .course-item.visible {
-            /* Animation: Final state */
             opacity: 1;
             transform: scale(1) translateY(0);
         }
@@ -230,7 +223,6 @@
     <label for="fileInput" class="file-selector">选择课程表文件 (.xlsx)</label>
     <input type="file" id="fileInput" accept=".xlsx, .xls">
 
-    <!-- Initial style="display: none;" is removed, animation handles visibility -->
     <div id="timetable-container"> 
         <div class="timetable-header">
             <h1 id="main-title">课程日程表 - 软件2446</h1>
@@ -270,7 +262,7 @@
             1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 8
         };
 
-        const timetableCont = document.getElementById('timetable-container'); // Get container once
+        const timetableCont = document.getElementById('timetable-container'); 
         const noDataMsg = document.getElementById('no-data-message');
         const tooltipElement = document.getElementById('teacherTooltip');
         
@@ -280,12 +272,10 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            // Reset UI for new file load
             timetableCont.classList.remove('loaded');
             document.getElementById('time-slots-column').innerHTML = '';
             document.getElementById('days-container').innerHTML = '';
             noDataMsg.style.display = 'none';
-
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -389,18 +379,13 @@
             }
             
             if (!actualDataFound) {
-                // timetableCont.style.display = 'none'; // Already hidden by opacity:0, or can be set here
-                timetableCont.classList.remove('loaded'); // Ensure it's hidden if previously loaded
+                timetableCont.classList.remove('loaded'); 
                 noDataMsg.style.display = 'block';
                 noDataMsg.textContent = `未在文件中找到含有 "${CLASS_FILTER_KEYWORD}" 的课程数据。`;
                 return;
             }
             
-            // Data found, prepare to show container
             noDataMsg.style.display = 'none';
-            // timetableCont.style.display = 'flex'; // This is handled by CSS now via #timetable-container default
-                                                  // And opacity handles visibility.
-                                                  // The container is always 'flex' by CSS rule.
             
             if (overallMinDate && overallMaxDate) {
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
@@ -412,17 +397,14 @@
 
             renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate);
 
-            // Trigger timetable container animation
-            // Use a small timeout to ensure DOM is updated and transitions can occur.
             setTimeout(() => {
                 timetableCont.classList.add('loaded');
-            }, 50); // Small delay for repaint/reflow
+            }, 50); 
         }
 
         function renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate) {
             const timeSlotsColumn = document.getElementById('time-slots-column');
             const daysContainer = document.getElementById('days-container');
-            // Clear is done in handleFile now before processing
 
             PERIOD_TIMES_DISPLAY.forEach(slot => {
                 const slotDiv = document.createElement('div');
@@ -444,13 +426,12 @@
             } else { return; }
 
             const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-            allDisplayDates.forEach((currentDisplayDate, dayIndex) => { // Get dayIndex for animation delay
+            allDisplayDates.forEach((currentDisplayDate, dayIndex) => { 
                 const dateKey = `${currentDisplayDate.getFullYear()}-${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
                 const displayDateString = `${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
                 
                 const dayColumn = document.createElement('div');
                 dayColumn.classList.add('day-column');
-                // dayColumn.style.transitionDelay will be set later for animation
 
                 const dayHeader = document.createElement('div');
                 dayHeader.classList.add('day-header');
@@ -464,10 +445,9 @@
                     const dayData = coursesByDay[dateKey];
                     dayData.courses.sort((a, b) => a.startPeriod - b.startPeriod);
 
-                    dayData.courses.forEach((course, courseIndex) => { // Get courseIndex for animation delay
+                    dayData.courses.forEach((course, courseIndex) => { 
                         const courseItem = document.createElement('div');
                         courseItem.classList.add('course-item');
-                        // courseItem.style.transitionDelay will be set later for animation
 
                         let topOffset = 0;
                         const startVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod];
@@ -497,8 +477,32 @@
 
                         courseItem.appendChild(courseNameDiv); courseItem.appendChild(courseLocationDiv); courseItem.appendChild(courseTimeDiv);
                         
-                        courseItem.addEventListener('mouseenter', (event) => { /* ... tooltip logic ... */ });
-                        courseItem.addEventListener('mouseleave', () => { /* ... tooltip logic ... */ });
+                        // --- FIX: Restore Tooltip Event Listeners ---
+                        courseItem.addEventListener('mouseenter', (event) => {
+                            tooltipElement.textContent = `教师：${course.teacher || '未知'}`;
+                            const itemRect = courseItem.getBoundingClientRect();
+                            const tooltipRect = tooltipElement.getBoundingClientRect();
+                            let top = itemRect.top + window.scrollY;
+                            let left = itemRect.right + 8 + window.scrollX;
+
+                            if (left + tooltipRect.width > window.innerWidth) {
+                                left = itemRect.left - tooltipRect.width - 8 + window.scrollX;
+                            }
+                            if (top + tooltipRect.height > window.innerHeight + window.scrollY) {
+                               top = itemRect.bottom - tooltipRect.height + window.scrollY;
+                            }
+                            if (top < window.scrollY) {
+                                top = window.scrollY + 5;
+                            }
+                            tooltipElement.style.top = `${top}px`;
+                            tooltipElement.style.left = `${left}px`;
+                            tooltipElement.classList.add('visible');
+                        });
+                        courseItem.addEventListener('mouseleave', () => {
+                            tooltipElement.classList.remove('visible');
+                        });
+                        // --- END FIX ---
+
                         coursesGrid.appendChild(courseItem);
                     });
                 } else {
@@ -511,53 +515,24 @@
                 daysContainer.appendChild(dayColumn);
             });
 
-            // Trigger animations for day columns and course items after they are in DOM
             setTimeout(() => {
                 const allDayColumns = daysContainer.querySelectorAll('.day-column');
                 allDayColumns.forEach((col, dayIdx) => {
-                    col.style.transitionDelay = `${dayIdx * 0.07}s`; // Stagger day columns
+                    col.style.transitionDelay = `${dayIdx * 0.07}s`; 
                     col.classList.add('visible');
 
                     const courseItemsInCol = col.querySelectorAll('.course-item');
                     courseItemsInCol.forEach((item, courseIdx) => {
-                        // Stagger course items: base delay from column + its own index
                         item.style.transitionDelay = `${dayIdx * 0.07 + 0.15 + courseIdx * 0.04}s`;
                         item.classList.add('visible');
                     });
                 });
-            }, 100); // Delay to start after container animation has likely begun
+            }, 100); 
         }
         
-        // Initial message:
-        noDataMsg.style.display = 'block'; // Show by default
-        timetableCont.classList.remove('loaded'); // Ensure hidden on page load
+        noDataMsg.style.display = 'block'; 
+        timetableCont.classList.remove('loaded'); 
         noDataMsg.textContent = '请选择一个课程表XLSX文件以上传。';
-        // Tooltip event listeners for courseItem (mouseenter, mouseleave)
-        // These need to be re-attached if content is cleared and re-rendered,
-        // or use event delegation on a parent like '.courses-grid' if performance becomes an issue.
-        // Current implementation re-adds listeners each time items are created.
-        function setupCourseItemTooltip(courseItem, course) { // Helper for brevity
-            courseItem.addEventListener('mouseenter', (event) => {
-                tooltipElement.textContent = `教师：${course.teacher || '未知'}`;
-                const itemRect = courseItem.getBoundingClientRect();
-                const tooltipRect = tooltipElement.getBoundingClientRect();
-                let top = itemRect.top + window.scrollY;
-                let left = itemRect.right + 8 + window.scrollX;
-                if (left + tooltipRect.width > window.innerWidth) {
-                    left = itemRect.left - tooltipRect.width - 8 + window.scrollX;
-                }
-                if (top + tooltipRect.height > window.innerHeight + window.scrollY) {
-                   top = itemRect.bottom - tooltipRect.height + window.scrollY;
-                }
-                if (top < window.scrollY) top = window.scrollY + 5;
-                tooltipElement.style.top = `${top}px`;
-                tooltipElement.style.left = `${left}px`;
-                tooltipElement.classList.add('visible');
-            });
-            courseItem.addEventListener('mouseleave', () => {
-                tooltipElement.classList.remove('visible');
-            });
-        }
     </script>
 </body>
 </html>
