@@ -18,7 +18,7 @@
             --error-color: #FF3B30;
             --shadow-color: rgba(0, 0, 0, 0.08);
             --header-height: 60px;
-            --time-slot-width: 100px;
+            --time-slot-width: 110px; /* 从 100px 增加到 110px */
             --time-slot-base-height: 60px;
             --time-slot-double-height: 120px; /* Adjusted for potential 90 min slots if used */
             --capsule-bg-color: #eaf6ff;
@@ -179,7 +179,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 5px;
+            padding: 5px 0; /* 调整左右 padding 为 0，因为文本会居中 */
             box-sizing: border-box;
             border-bottom: 1px solid var(--border-color);
             font-size: 12px;
@@ -187,6 +187,13 @@
             text-align: center;
         }
         .time-slot:last-child { border-bottom: none; }
+
+        .time-slot .time-value {
+            white-space: nowrap;
+        }
+        .time-slot .period-label {
+            font-size: 11px; /* 这个可以保持 */
+        }
 
         .days-container { display: flex; flex-grow: 1; overflow-x: auto; }
 
@@ -288,7 +295,7 @@
 
         @media (max-width: 768px) {
             body { padding: 10px; }
-            .time-slots-column { flex: 0 0 70px; var(--time-slot-width: 70px); } /* Adjusted */
+            .time-slots-column { flex: 0 0 85px; var(--time-slot-width: 85px); }  /* 从 70px 增加到 85px *//* 同步变量 */
             .day-column { min-width: 140px; }
             .course-item { font-size: 11px; padding: 6px 8px;}
             .course-name { font-size: 12px; }
@@ -558,7 +565,10 @@
                 slotDiv.classList.add('time-slot');
                 slotDiv.style.height = `${slot.height}px`;
                 if (slot.period_label === "9-10") slotDiv.classList.add('double'); // Potentially style differently
-                slotDiv.innerHTML = `<p style="margin:2px 0;">${slot.time}</p><p style="margin:2px 0; font-size:11px;">${slot.display_label}</p>`;
+                slotDiv.innerHTML = `
+                    <p class="time-value" style="margin:2px 0;">${slot.time}</p>
+                    <p class="period-label" style="margin:2px 0;">${slot.display_label}</p>
+                `;
                 timeSlotsColumn.appendChild(slotDiv);
             });
 
