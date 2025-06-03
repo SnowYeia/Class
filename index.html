@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>课程日程表 - 软件2446</title>
+    <title>课程日程表</title>
     <script src="xlsx.full.min.js"></script>
     <style>
         :root {
@@ -13,14 +13,14 @@
             --text-color-secondary: #555555;
             --text-color-tertiary: #888888;
             --border-color: #eeeeee;
-            --accent-color: #007aff; /* iOS Blue - Used for loading */
-            --success-color: #34c759; /* iOS Green */
-            --error-color: #ff3b30;   /* iOS Red */
+            --accent-color: #007aff;
+            --success-color: #34C759;
+            --error-color: #FF3B30;
             --shadow-color: rgba(0, 0, 0, 0.08);
             --header-height: 60px;
             --time-slot-width: 100px;
             --time-slot-base-height: 60px;
-            --time-slot-double-height: 120px;
+            --time-slot-double-height: 120px; /* Adjusted for potential 90 min slots if used */
             --capsule-bg-color: #eaf6ff;
             --capsule-text-color: #005fbb;
         }
@@ -38,65 +38,93 @@
             overflow-x: hidden; 
         }
 
-        #status-indicator {
+        /* Status Indicator (Loading/Success/Error) */
+        .status-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            background-color: rgba(245, 245, 247, 0.9); /* Neutral loading background */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 28px 38px;
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 10px 18px;
-            border-radius: 12px;
-            background-color: var(--card-bg-color); /* Default BG */
-            box-shadow: 0 3px 10px rgba(0,0,0,0.07);
-            color: var(--text-color-secondary);
-            margin-top: 40px; /* Give some space from top */
-            margin-bottom: 20px;
-            max-width: 380px;
-            text-align: left;
+            z-index: 2000; /* Higher z-index */
+            text-align: center;
             opacity: 0;
-            transform: translateY(10px) scale(0.98);
-            transition: opacity 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), 
-                        transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), 
-                        background-color 0.4s ease;
+            visibility: hidden; /* Hidden by default */
+            transform: translate(-50%, -50%) scale(0.95);
+            transition: opacity 0.35s ease-out, transform 0.35s ease-out, background-color 0.4s ease-in-out, visibility 0s 0.35s;
         }
-        #status-indicator.visible {
+
+        .status-indicator.visible {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0s, 0s, 0s, 0s; /* Ensure visibility transition applies correctly when becoming visible */
         }
+
+        .status-indicator.hiding {
+            opacity: 0;
+            transform: translate(-50%, -65%) scale(0.9); /* Move up further and fade */
+            transition-delay: 0s, 0s, 0s, 0s; /* transition applies immediately */
+        }
+
         .status-icon-container {
-            margin-right: 12px;
+            margin-bottom: 15px;
+            width: 36px; 
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 24px; /* Fixed width for icon area */
-            height: 24px;
+            color: var(--text-color-secondary); /* Default icon color */
         }
-        .status-svg {
-            width: 20px; /* Icon size */
-            height: 20px;
-            stroke-width: 2; /* Default stroke, can be overridden in specific SVGs */
+
+        .status-icon-container svg {
+            width: 100%;
+            height: 100%;
         }
-        .status-svg.loading-animation {
-            animation: spin 1s linear infinite;
+        
+        .status-icon-container svg.loading-animation { /* Whole SVG spin */
+            animation: fullSpin 1.2s linear infinite;
         }
-        @keyframes spin {
+
+        @keyframes fullSpin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
         .status-text {
             font-size: 15px;
-            font-weight: 500;
-            transition: color 0.4s ease;
+            color: var(--text-color-secondary);
+            margin: 0;
+            max-width: 280px;
+            line-height: 1.5;
         }
 
-        /* Loading state specific */
-        #status-indicator.loading .status-svg { color: var(--accent-color); }
-        /* Success state specific */
-        #status-indicator.success { background-color: rgba(52, 199, 89, 0.12); }
-        #status-indicator.success .status-svg { color: var(--success-color); }
-        #status-indicator.success .status-text { color: var(--success-color); }
-        /* Error state specific */
-        #status-indicator.error { background-color: rgba(255, 59, 48, 0.1); }
-        #status-indicator.error .status-svg { color: var(--error-color); }
-        #status-indicator.error .status-text { color: var(--error-color); }
+        .status-indicator.success {
+            background-color: rgba(230, 247, 237, 0.95); /* Lighter success green background */
+        }
+        .status-indicator.success .status-text {
+            color: #006422; 
+        }
+        .status-indicator.success .status-icon-container {
+            color: var(--success-color);
+        }
+
+        .status-indicator.error {
+            background-color: rgba(255, 235, 234, 0.95); /* Lighter error red background */
+        }
+        .status-indicator.error .status-text {
+            color: #c51605;
+        }
+        .status-indicator.error .status-icon-container {
+            color: var(--error-color);
+        }
 
 
         #timetable-container {
@@ -108,14 +136,26 @@
             overflow: hidden;
             display: flex; 
             flex-direction: column;
-            opacity: 0;
+            opacity: 0; /* Initially hidden for animation */
             transform: translateY(20px);
-            transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+            filter: blur(0px); /* Start clear, or blurred if .loading-background is added */
+            transition: opacity 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s, /* Slight delay after indicator hides */
+                        transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s,
+                        filter 0.4s ease-out 0.1s;
         }
         #timetable-container.loaded {
             opacity: 1;
             transform: translateY(0);
+            filter: blur(0px);
         }
+        #timetable-container.loading-background { /* Applied while loading indicator is primary */
+            opacity: 0.4;
+            filter: blur(5px);
+            transform: translateY(10px) scale(0.97); /* Slightly back and smaller */
+             /* Transition for when this class is added/removed */
+            transition: opacity 0.3s ease-out, filter 0.3s ease-out, transform 0.3s ease-out;
+        }
+
 
         .timetable-header {
             padding: 18px 25px;
@@ -127,40 +167,150 @@
         .timetable-header p { margin: 5px 0 0; font-size: 14px; color: var(--text-color-secondary); }
 
         .timetable-body { display: flex; flex-grow: 1; }
-        .time-slots-column { flex: 0 0 var(--time-slot-width); padding-top: 50px; border-right: 1px solid var(--border-color); }
-        .time-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px; box-sizing: border-box; border-bottom: 1px solid var(--border-color); font-size: 12px; color: var(--text-color-tertiary); text-align: center; }
+
+        .time-slots-column {
+            flex: 0 0 var(--time-slot-width);
+            padding-top: 50px; /* Matches day-header height */
+            border-right: 1px solid var(--border-color);
+        }
+
+        .time-slot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            box-sizing: border-box;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-color-tertiary);
+            text-align: center;
+        }
         .time-slot:last-child { border-bottom: none; }
+
         .days-container { display: flex; flex-grow: 1; overflow-x: auto; }
-        .day-column { flex: 1 1 0; min-width: 180px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; opacity: 0; transform: translateY(15px); transition: opacity 0.4s ease-out, transform 0.4s ease-out; }
+
+        .day-column {
+            flex: 1 1 0; /* Allow shrinking but prefer specified min-width */
+            min-width: 180px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+        }
         .day-column:last-child { border-right: none; }
-        .day-column.visible { opacity: 1; transform: translateY(0); }
-        .day-header { height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 500; background-color: #f9f9f9; border-bottom: 1px solid var(--border-color); padding: 5px; box-sizing: border-box; font-size: 15px; }
+        .day-column.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .day-header {
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            background-color: #f9f9f9;
+            border-bottom: 1px solid var(--border-color);
+            padding: 5px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
         .day-header .day-name { color: var(--text-color-primary); }
         .day-header .day-date { font-size: 12px; color: var(--text-color-secondary); }
+
         .courses-grid { position: relative; flex-grow: 1; }
-        .no-course-message { text-align: center; margin-top: 30px; color: var(--text-color-tertiary); font-size: 14px; padding: 0 10px; }
-        .course-item { position: absolute; left: 5px; right: 5px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 8px 10px; box-sizing: border-box; overflow: hidden; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: default; opacity: 0; transform: scale(0.95) translateY(5px); transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .course-item:hover { transform: translateY(-2px) scale(1.02) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .course-item.visible { opacity: 1; transform: scale(1) translateY(0); }
+        .no-course-message {
+            text-align: center;
+            margin-top: 30px;
+            color: var(--text-color-tertiary);
+            font-size: 14px;
+            padding: 0 10px;
+        }
+
+        .course-item {
+            position: absolute;
+            left: 5px;
+            right: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            font-size: 13px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: default;
+            opacity: 0;
+            transform: scale(0.95) translateY(5px); 
+            transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease-out;
+        }
+        .course-item:hover {
+            transform: translateY(-2px) scale(1.02) !important; /* Ensure hover transform overrides animation one */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .course-item.visible {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
         .course-name { font-weight: 600; color: var(--text-color-primary); margin-bottom: 4px; font-size: 14px; }
         .course-location { font-size: 12px; color: var(--text-color-secondary); margin-bottom: 2px; }
-        .course-time { font-size: 11px; color: var(--capsule-text-color); background-color: var(--capsule-bg-color); padding: 3px 8px; border-radius: 12px; display: inline-block; margin-top: 5px; }
-        .teacher-tooltip { position: fixed; background-color: rgba(20, 20, 20, 0.9); color: #ffffff; padding: 6px 12px; border-radius: 6px; font-size: 12px; z-index: 10000; pointer-events: none; box-shadow: 0 3px 10px rgba(0,0,0,0.2); white-space: nowrap; opacity: 0; transform: scale(0.95); transition: opacity 0.15s ease-out, transform 0.15s ease-out; }
+        .course-time {
+            font-size: 11px;
+            color: var(--capsule-text-color);
+            background-color: var(--capsule-bg-color);
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .teacher-tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.9);
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            white-space: nowrap;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+        }
         .teacher-tooltip.visible { opacity: 1; transform: scale(1); }
-        @media (max-width: 768px) { body { padding: 10px; } .time-slots-column { flex: 0 0 80px; } .day-column { min-width: 150px; } .course-item { font-size: 11px; } .course-name { font-size: 12px; } .course-location, .course-time { font-size: 10px; } .course-time { padding: 2px 6px; } }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .time-slots-column { flex: 0 0 70px; var(--time-slot-width: 70px); } /* Adjusted */
+            .day-column { min-width: 140px; }
+            .course-item { font-size: 11px; padding: 6px 8px;}
+            .course-name { font-size: 12px; }
+            .course-location, .course-time { font-size: 10px; }
+            .course-time { padding: 2px 6px; }
+            .status-indicator { padding: 20px; width: 80%;}
+            .status-text { font-size: 14px;}
+            .status-icon-container { width: 30px; height: 30px; margin-bottom: 10px;}
+        }
     </style>
 </head>
 <body>
-    <div id="status-indicator">
+    <div id="loading-indicator" class="status-indicator">
         <div class="status-icon-container">
-            <!-- SVG icon will be injected here -->
+            <!-- SVG will be injected here by JS -->
         </div>
-        <span class="status-text"></span>
+        <p class="status-text"></p>
     </div>
 
     <div id="timetable-container"> 
         <div class="timetable-header">
-            <h1 id="main-title">课程日程表 - 软件2446</h1>
+            <h1 id="main-title">课程日程表</h1>
             <p id="week-dates-info"></p>
         </div>
         <div class="timetable-body">
@@ -168,13 +318,12 @@
             <div class="days-container" id="days-container"></div>
         </div>
     </div>
-    <!-- Removed old no-data-message p tag -->
+    
     <div id="teacherTooltip" class="teacher-tooltip"></div>
 
     <script>
         const CLASS_FILTER_KEYWORD = "软件2446";
         const DEFAULT_TIMETABLE_FILE = "c.xlsx";
-        // Column definitions... (same as before)
         const COLUMN_CLASS_FILTER = 'F';
         const COLUMN_DAY_OF_WEEK = 'J';
         const COLUMN_COURSE_DATE = 'Q';
@@ -183,7 +332,6 @@
         const COLUMN_LOCATION = 'M';
         const COLUMN_TEACHER = 'E';
 
-        // PERIOD_TIMES_DISPLAY and PERIOD_TO_DISPLAY_SLOT_INDEX... (same as before)
         const PERIOD_TIMES_DISPLAY = [
             { period_label: "1", time: "8:00-8:45", display_label: "第1节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
             { period_label: "2", time: "8:55-9:40", display_label: "第2节", height: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--time-slot-base-height')) || 60 },
@@ -199,68 +347,62 @@
             1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 8
         };
 
-        const timetableCont = document.getElementById('timetable-container'); 
-        const statusIndicator = document.getElementById('status-indicator'); // New status indicator element
-        const statusIconContainer = statusIndicator.querySelector('.status-icon-container');
-        const statusTextElement = statusIndicator.querySelector('.status-text');
+        const timetableCont = document.getElementById('timetable-container');
         const tooltipElement = document.getElementById('teacherTooltip');
 
-        const loadingSVG = `
-            <svg class="status-svg loading-animation" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.8" opacity="0.3"/>
-                <path d="M18 10C18 5.58172 14.4183 2 10 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>`;
-        const successSVG = `
-            <svg class="status-svg" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 10.5L9 12.5L13.5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.8"/>
-            </svg>`;
-        const errorSVG = `
-            <svg class="status-svg" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.8"/>
-                <path d="M7 7L13 13M7 13L13 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>`;
+        const SVG_LOADING = `
+        <svg viewBox="0 0 20 20" fill="none" class="loading-animation">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+            <path d="M10 2A8 8 0 0 1 18 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>`;
+        const SVG_SUCCESS = `
+        <svg viewBox="0 0 20 20" fill="none">
+            <path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+        </svg>`;
+        const SVG_ERROR = `
+        <svg viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12.5 7.5l-5 5M7.5 7.5l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>`;
 
-        function updateStatusIndicator(state, message = "") {
-            statusIndicator.classList.remove('loading', 'success', 'error', 'visible'); // Clear previous states
-            
-            // Need a slight delay for class removal to be processed before adding new ones for transition
-            requestAnimationFrame(() => {
-                if (state === 'hidden') {
-                    statusIndicator.classList.remove('visible');
-                    return;
-                }
-                
-                statusIndicator.classList.add(state); // Add current state class
-                statusIndicator.classList.add('visible'); // Make it visible
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusIconContainer = loadingIndicator.querySelector('.status-icon-container');
+        const statusTextElement = loadingIndicator.querySelector('.status-text');
 
-                switch (state) {
-                    case 'loading':
-                        statusIconContainer.innerHTML = loadingSVG;
-                        statusTextElement.textContent = message || `正在加载 ${DEFAULT_TIMETABLE_FILE}...`;
-                        break;
-                    case 'success':
-                        statusIconContainer.innerHTML = successSVG;
-                        statusTextElement.textContent = message || "加载成功！";
-                        break;
-                    case 'error':
-                        statusIconContainer.innerHTML = errorSVG;
-                        statusTextElement.textContent = message; // Error message is usually specific
-                        break;
-                }
-            });
+        function updateLoadingIndicator(state, message) {
+            loadingIndicator.classList.remove('success', 'error', 'hiding');
+            statusIconContainer.innerHTML = ''; 
+
+            switch (state) {
+                case 'loading':
+                    statusIconContainer.innerHTML = SVG_LOADING;
+                    break;
+                case 'success':
+                    statusIconContainer.innerHTML = SVG_SUCCESS;
+                    loadingIndicator.classList.add('success');
+                    break;
+                case 'error':
+                    statusIconContainer.innerHTML = SVG_ERROR;
+                    loadingIndicator.classList.add('error');
+                    break;
+            }
+            statusTextElement.textContent = message;
+            loadingIndicator.classList.add('visible');
         }
-
+        
         async function loadAndProcessDefaultFile() {
-            updateStatusIndicator('loading'); // Initial loading message set by default in switch
-            timetableCont.classList.remove('loaded'); 
-            document.getElementById('time-slots-column').innerHTML = ''; 
-            document.getElementById('days-container').innerHTML = '';   
+            updateLoadingIndicator('loading', `正在加载课程表 (${DEFAULT_TIMETABLE_FILE})...`);
+            timetableCont.classList.add('loading-background');
+            timetableCont.classList.remove('loaded');
+            
+            document.getElementById('time-slots-column').innerHTML = '';
+            document.getElementById('days-container').innerHTML = '';
 
             try {
                 const response = await fetch(DEFAULT_TIMETABLE_FILE);
                 if (!response.ok) {
-                    throw new Error(`无法访问文件 "${DEFAULT_TIMETABLE_FILE}" (HTTP ${response.status})`);
+                     throw new Error(`文件获取失败 (${response.status} ${response.statusText})。请确保 "${DEFAULT_TIMETABLE_FILE}" 存在于同一目录且可访问。`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 const data = new Uint8Array(arrayBuffer);
@@ -268,117 +410,288 @@
                 const firstSheetName = workbook.SheetNames[0];
 
                 if (!firstSheetName) {
-                    throw new Error(`"${DEFAULT_TIMETABLE_FILE}" 中没有工作表。`);
+                    throw new Error(`文件 "${DEFAULT_TIMETABLE_FILE}" 中没有找到有效的工作表 (sheet)。`);
                 }
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 
-                // processAndRenderTimetable will return true if data found, false otherwise
-                const dataProcessedSuccessfully = processAndRenderTimetable(jsonData);
+                const { coursesByDay, overallMinDate, overallMaxDate, actualDataFound } = parseExcelData(jsonData);
 
-                if (dataProcessedSuccessfully) {
-                    updateStatusIndicator('success');
+                if (actualDataFound) {
+                    document.getElementById('main-title').textContent = `课程日程表 - ${CLASS_FILTER_KEYWORD}`;
+                    if (overallMinDate && overallMaxDate) {
+                        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                        document.getElementById('week-dates-info').textContent = 
+                            `${overallMinDate.toLocaleDateString('zh-CN', options)} 至 ${overallMaxDate.toLocaleDateString('zh-CN', options)}`;
+                    } else {
+                        document.getElementById('week-dates-info').textContent = "日期范围未知";
+                    }
+                    
+                    renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate);
+                    updateLoadingIndicator('success', '课程表加载成功！');
+                    
                     setTimeout(() => {
-                        updateStatusIndicator('hidden');
-                        // Delay timetable animation slightly after status hides
-                        setTimeout(() => {
-                            timetableCont.classList.add('loaded');
-                        }, 100); // Short delay for status to start fading out
-                    }, 1200); // Success message visible for 1.2 seconds
-                } 
-                // If processAndRenderTimetable returned false, it means no relevant data found.
-                // The error state for "no data found" is handled within processAndRenderTimetable.
+                        loadingIndicator.classList.add('hiding');
+                        // Wait for hiding animation to mostly complete before removing visible
+                        setTimeout(() => loadingIndicator.classList.remove('visible'), 350);
+
+
+                        timetableCont.classList.remove('loading-background');
+                        timetableCont.classList.add('loaded');
+                    }, 1000); // Time to display success message
+
+                } else {
+                    updateLoadingIndicator('error', `在 "${DEFAULT_TIMETABLE_FILE}" 中未找到与 "${CLASS_FILTER_KEYWORD}" 相关的课程数据。`);
+                    timetableCont.classList.add('loading-background');
+                    timetableCont.classList.remove('loaded');
+                }
 
             } catch (error) {
-                console.error("加载课程表出错:", error);
-                updateStatusIndicator('error', `加载失败: ${error.message}`);
-                timetableCont.classList.remove('loaded'); 
+                console.error("加载或处理课程表时出错:", error);
+                updateLoadingIndicator('error', `加载课程表失败：${error.message}`);
+                timetableCont.classList.add('loading-background');
+                timetableCont.classList.remove('loaded');
             }
         }
 
-        // getColumnIndex, parseSession, excelSerialDateToJSDate... (same as before)
-        function getColumnIndex(colLetter) { return colLetter.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0); }
-        function parseSession(sessionStr) { if (!sessionStr || typeof sessionStr !== 'string') return null; const match = sessionStr.match(/(\d+)-?(\d*)/); if (match) { const start = parseInt(match[1]); const end = match[2] ? parseInt(match[2]) : start; return { startPeriod: start, endPeriod: end }; } return null; }
-        function excelSerialDateToJSDate(serial) { const utc_days  = Math.floor(serial - 25569); const utc_value = utc_days * 86400; const date_info = new Date(utc_value * 1000); const fractional_day = serial - Math.floor(serial) + 0.0000001; let total_seconds = Math.floor(86400 * fractional_day); const seconds = total_seconds % 60; total_seconds -= seconds; const hours = Math.floor(total_seconds / (60 * 60)); const minutes = Math.floor(total_seconds / 60) % 60; return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds); }
-
-
-        function processAndRenderTimetable(rawData) {
+        function parseExcelData(rawData) {
             const coursesByDay = {};
             let overallMinDate = null;
             let overallMaxDate = null;
             let actualDataFound = false;
-            // colIdx definition... (same as before)
-            const colIdx = { filter: getColumnIndex(COLUMN_CLASS_FILTER), dayOfWeek: getColumnIndex(COLUMN_DAY_OF_WEEK), courseDate: getColumnIndex(COLUMN_COURSE_DATE), session: getColumnIndex(COLUMN_SESSION), courseName: getColumnIndex(COLUMN_COURSE_NAME), location: getColumnIndex(COLUMN_LOCATION), teacher: getColumnIndex(COLUMN_TEACHER) };
-            const dataStartIndex = (rawData.length > 0 && typeof rawData[0][colIdx.filter] === 'string' && isNaN(parseInt(rawData[0][colIdx.dayOfWeek]))) ? 1 : 0;
+
+            const colIdx = {
+                filter: getColumnIndex(COLUMN_CLASS_FILTER),
+                dayOfWeek: getColumnIndex(COLUMN_DAY_OF_WEEK),
+                courseDate: getColumnIndex(COLUMN_COURSE_DATE),
+                session: getColumnIndex(COLUMN_SESSION),
+                courseName: getColumnIndex(COLUMN_COURSE_NAME),
+                location: getColumnIndex(COLUMN_LOCATION),
+                teacher: getColumnIndex(COLUMN_TEACHER)
+            };
+            
+            const dataStartIndex = (rawData.length > 0 && rawData[0] && typeof rawData[0][colIdx.filter] === 'string' && isNaN(parseInt(rawData[0][colIdx.dayOfWeek]))) ? 1 : 0;
 
             for (let i = dataStartIndex; i < rawData.length; i++) {
-                // Row processing logic... (same as before)
                 const row = rawData[i];
                 if (!row || row.length === 0) continue;
                 const filterCell = row[colIdx.filter] ? String(row[colIdx.filter]) : "";
 
                 if (filterCell.includes(CLASS_FILTER_KEYWORD)) {
                     const dayOfWeekValue = parseInt(row[colIdx.dayOfWeek]);
+                    if (isNaN(dayOfWeekValue) || dayOfWeekValue < 0 || dayOfWeekValue > 6) continue;
+
                     let courseDateCell = row[colIdx.courseDate];
                     let currentCourseDate;
-                    if (typeof courseDateCell === 'number') { currentCourseDate = excelSerialDateToJSDate(courseDateCell); }
-                    else if (typeof courseDateCell === 'string') { currentCourseDate = new Date(courseDateCell.replace(/-/g, '/'));}
-                    else { continue; }
+                    if (typeof courseDateCell === 'number') {
+                        currentCourseDate = excelSerialDateToJSDate(courseDateCell);
+                    } else if (typeof courseDateCell === 'string') {
+                         currentCourseDate = new Date(courseDateCell.replace(/-/g, '/').replace(/\./g, '/'));
+                    } else { continue; }
+
                     if (isNaN(currentCourseDate.getTime())) { continue; }
                     currentCourseDate.setHours(0,0,0,0);
+
                     if (!overallMinDate || currentCourseDate < overallMinDate) overallMinDate = new Date(currentCourseDate);
                     if (!overallMaxDate || currentCourseDate > overallMaxDate) overallMaxDate = new Date(currentCourseDate);
+                    
                     const dateKey = `${currentCourseDate.getFullYear()}-${String(currentCourseDate.getMonth() + 1).padStart(2, '0')}-${String(currentCourseDate.getDate()).padStart(2, '0')}`;
                     const sessionInfo = parseSession(String(row[colIdx.session]));
                     if (!sessionInfo) { continue; }
-                    const course = { name: String(row[colIdx.courseName] || "未知课程"), location: String(row[colIdx.location] || "地点待定"), teacher: String(row[colIdx.teacher] || "未知教师"), dayOfWeek: dayOfWeekValue, dateObj: new Date(currentCourseDate), dateKey: dateKey, ...sessionInfo, };
-                    if (!coursesByDay[dateKey]) { coursesByDay[dateKey] = { dateObj: new Date(currentCourseDate), courses: [] }; }
+
+                    const course = {
+                        name: String(row[colIdx.courseName] || "未知课程"),
+                        location: String(row[colIdx.location] || "地点待定"),
+                        teacher: String(row[colIdx.teacher] || "未知教师"),
+                        dayOfWeek: dayOfWeekValue,
+                        dateObj: new Date(currentCourseDate),
+                        dateKey: dateKey,
+                        ...sessionInfo,
+                    };
+
+                    if (!coursesByDay[dateKey]) {
+                        coursesByDay[dateKey] = { dateObj: new Date(currentCourseDate), courses: [] };
+                    }
                     coursesByDay[dateKey].courses.push(course);
                     actualDataFound = true;
                 }
             }
-            
-            if (!actualDataFound) {
-                updateStatusIndicator('error', `"${DEFAULT_TIMETABLE_FILE}" 中未找到 "${CLASS_FILTER_KEYWORD}" 的课程数据。`);
-                timetableCont.classList.remove('loaded'); 
-                return false; // Indicate no data was found to render
-            }
-            
-            // If data found, statusIndicator will be handled by loadAndProcessDefaultFile success path
-            // updateStatusIndicator('hidden'); // No, this is handled by caller on success
-            
-            if (overallMinDate && overallMaxDate) {
-                const options = { year: 'numeric', month: 'long', day: 'numeric' };
-                 document.getElementById('week-dates-info').textContent = 
-                    `${overallMinDate.toLocaleDateString('zh-CN', options)} 至 ${overallMaxDate.toLocaleDateString('zh-CN', options)}`;
-            } else {
-                 document.getElementById('week-dates-info').textContent = "日期范围未知";
-            }
+            return { coursesByDay, overallMinDate, overallMaxDate, actualDataFound };
+        }
 
-            renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate);
-            return true; // Indicate data was found and rendered (or will be animated)
+        function getColumnIndex(colLetter) {
+            return colLetter.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+        }
+
+        function parseSession(sessionStr) {
+            if (!sessionStr || typeof sessionStr !== 'string') return null;
+            const match = sessionStr.match(/(\d+)-?(\d*)/);
+            if (match) {
+                const start = parseInt(match[1]);
+                const end = match[2] ? parseInt(match[2]) : start;
+                if (isNaN(start) || (match[2] && isNaN(end))) return null;
+                return { startPeriod: start, endPeriod: end };
+            }
+            return null;
+        }
+        
+        function excelSerialDateToJSDate(serial) {
+            const utc_days  = Math.floor(serial - 25569);
+            const utc_value = utc_days * 86400;                                        
+            const date_info = new Date(utc_value * 1000);
+            const fractional_day = serial - Math.floor(serial) + 0.0000001; // Add epsilon for precision
+            let total_seconds = Math.floor(86400 * fractional_day);
+            const seconds = total_seconds % 60;
+            total_seconds -= seconds;
+            const hours = Math.floor(total_seconds / (60 * 60));
+            const minutes = Math.floor(total_seconds / 60) % 60;
+            return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
         }
 
         function renderTimetableDOM(coursesByDay, overallMinDate, overallMaxDate) {
-            // DOM rendering logic for timetable slots, days, courses... (same as before)
             const timeSlotsColumn = document.getElementById('time-slots-column');
             const daysContainer = document.getElementById('days-container');
-            PERIOD_TIMES_DISPLAY.forEach(slot => { const slotDiv = document.createElement('div'); slotDiv.classList.add('time-slot'); slotDiv.style.height = `${slot.height}px`; if (slot.period_label === "9-10") slotDiv.classList.add('double'); slotDiv.innerHTML = `<p style="margin:2px 0;">${slot.time}</p><p style="margin:2px 0; font-size:11px;">${slot.display_label}</p>`; timeSlotsColumn.appendChild(slotDiv); });
+            // Content already cleared by loadAndProcessDefaultFile
+
+            PERIOD_TIMES_DISPLAY.forEach(slot => {
+                const slotDiv = document.createElement('div');
+                slotDiv.classList.add('time-slot');
+                slotDiv.style.height = `${slot.height}px`;
+                if (slot.period_label === "9-10") slotDiv.classList.add('double'); // Potentially style differently
+                slotDiv.innerHTML = `<p style="margin:2px 0;">${slot.time}</p><p style="margin:2px 0; font-size:11px;">${slot.display_label}</p>`;
+                timeSlotsColumn.appendChild(slotDiv);
+            });
+
             const allDisplayDates = [];
-            if (overallMinDate && overallMaxDate) { let currentDateIter = new Date(overallMinDate); currentDateIter.setHours(0,0,0,0); const lastDateToDisplay = new Date(overallMaxDate); lastDateToDisplay.setHours(0,0,0,0); while (currentDateIter <= lastDateToDisplay) { allDisplayDates.push(new Date(currentDateIter)); currentDateIter.setDate(currentDateIter.getDate() + 1); } } else { return; }
+            if (overallMinDate && overallMaxDate) {
+                let currentDateIter = new Date(overallMinDate); currentDateIter.setHours(0,0,0,0);
+                const lastDateToDisplay = new Date(overallMaxDate); lastDateToDisplay.setHours(0,0,0,0);
+                // Ensure iteration does not go into an infinite loop if dates are invalid
+                let guard = 0;
+                const MAX_DAYS = 365; // Safety break
+                while (currentDateIter <= lastDateToDisplay && guard < MAX_DAYS) {
+                    allDisplayDates.push(new Date(currentDateIter));
+                    currentDateIter.setDate(currentDateIter.getDate() + 1);
+                    guard++;
+                }
+            } else { 
+                console.warn("Cannot render days: overallMinDate or overallMaxDate is missing.");
+                return; 
+            }
+
             const dayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-            allDisplayDates.forEach((currentDisplayDate, dayIndex) => {  const dateKey = `${currentDisplayDate.getFullYear()}-${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`; const displayDateString = `${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;  const dayColumn = document.createElement('div'); dayColumn.classList.add('day-column'); const dayHeader = document.createElement('div'); dayHeader.classList.add('day-header'); dayHeader.innerHTML = `<span class="day-name">${dayNames[currentDisplayDate.getDay()]}</span><span class="day-date">${displayDateString}</span>`; dayColumn.appendChild(dayHeader); const coursesGrid = document.createElement('div'); coursesGrid.classList.add('courses-grid');  if (coursesByDay[dateKey] && coursesByDay[dateKey].courses.length > 0) { const dayData = coursesByDay[dateKey]; dayData.courses.sort((a, b) => a.startPeriod - b.startPeriod); dayData.courses.forEach((course, courseIndex) => {  const courseItem = document.createElement('div'); courseItem.classList.add('course-item'); let topOffset = 0; const startVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod]; for (let i = 0; i < startVisualSlotIndex; i++) { topOffset += PERIOD_TIMES_DISPLAY[i].height; } courseItem.style.top = `${topOffset}px`; let courseCardHeight = 0; const endVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod]; for (let i = startVisualSlotIndex; i <= endVisualSlotIndex; i++) { courseCardHeight += PERIOD_TIMES_DISPLAY[i].height; } courseItem.style.height = `${courseCardHeight - 10}px`; const courseNameDiv = document.createElement('div'); courseNameDiv.classList.add('course-name'); courseNameDiv.textContent = course.name; const courseLocationDiv = document.createElement('div'); courseLocationDiv.classList.add('course-location'); courseLocationDiv.textContent = `📍 ${course.location}`; const courseTimeDiv = document.createElement('div'); courseTimeDiv.classList.add('course-time'); const startTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod]]; const endTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod]]; let timeStr = `节次 ${course.startPeriod}-${course.endPeriod}`; if (startTimeInfo && endTimeInfo) { const actualStartT = startTimeInfo.time.split('-')[0]; let actualEndT = endTimeInfo.time.split('-')[1]; if (course.startPeriod >=9 && course.endPeriod >=9 && course.startPeriod <= course.endPeriod) { actualEndT = PERIOD_TIMES_DISPLAY[8].time.split('-')[1]; } timeStr = `${actualStartT} - ${actualEndT}`; } courseTimeDiv.innerHTML = `🕘 ${timeStr}`; courseItem.appendChild(courseNameDiv); courseItem.appendChild(courseLocationDiv); courseItem.appendChild(courseTimeDiv); courseItem.addEventListener('mouseenter', (event) => { tooltipElement.textContent = `教师：${course.teacher || '未知'}`; const itemRect = courseItem.getBoundingClientRect(); const tooltipRect = tooltipElement.getBoundingClientRect(); let top = itemRect.top + window.scrollY; let left = itemRect.right + 8 + window.scrollX; if (left + tooltipRect.width > window.innerWidth) { left = itemRect.left - tooltipRect.width - 8 + window.scrollX; } if (top + tooltipRect.height > window.innerHeight + window.scrollY) { top = itemRect.bottom - tooltipRect.height + window.scrollY; } if (top < window.scrollY) { top = window.scrollY + 5; } tooltipElement.style.top = `${top}px`; tooltipElement.style.left = `${left}px`; tooltipElement.classList.add('visible'); }); courseItem.addEventListener('mouseleave', () => { tooltipElement.classList.remove('visible'); }); coursesGrid.appendChild(courseItem); }); } else { const noCourseMsgEl = document.createElement('p'); noCourseMsgEl.classList.add('no-course-message'); noCourseMsgEl.textContent = "今日无课"; coursesGrid.appendChild(noCourseMsgEl); } dayColumn.appendChild(coursesGrid); daysContainer.appendChild(dayColumn); });
+            allDisplayDates.forEach((currentDisplayDate, dayIndex) => { 
+                const dateKey = `${currentDisplayDate.getFullYear()}-${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
+                const displayDateString = `${String(currentDisplayDate.getMonth() + 1).padStart(2, '0')}-${String(currentDisplayDate.getDate()).padStart(2, '0')}`;
+                
+                const dayColumn = document.createElement('div');
+                dayColumn.classList.add('day-column');
 
-            // Animation triggering for day columns and course items
-            // This timeout should ideally be chained after timetableCont.loaded animation is complete
-            // For simplicity, a fixed delay relative to when renderTimetableDOM is called.
-            const mainContainerLoadTime = 500; // From timetable-container transition
-            const statusIndicatorHideTime = 350; // From status-indicator transition
-            const successDisplayTime = 1200; // Time success message is shown
+                const dayHeader = document.createElement('div');
+                dayHeader.classList.add('day-header');
+                dayHeader.innerHTML = `<span class="day-name">${dayNames[currentDisplayDate.getDay()]}</span><span class="day-date">${displayDateString}</span>`;
+                dayColumn.appendChild(dayHeader);
 
-            // This timeout starts roughly when timetableCont.classList.add('loaded') is called
-            // but that itself is inside a timeout.
-            // Let's assume timetableCont animation starts quickly after statusIndicator is hidden.
+                const coursesGrid = document.createElement('div');
+                coursesGrid.classList.add('courses-grid');
+                
+                if (coursesByDay[dateKey] && coursesByDay[dateKey].courses.length > 0) {
+                    const dayData = coursesByDay[dateKey];
+                    dayData.courses.sort((a, b) => a.startPeriod - b.startPeriod);
+
+                    dayData.courses.forEach((course, courseIndex) => { 
+                        const courseItem = document.createElement('div');
+                        courseItem.classList.add('course-item');
+
+                        let topOffset = 0;
+                        const startVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod];
+                        if (typeof startVisualSlotIndex === 'undefined') {
+                            console.warn("Invalid start period for course, skipping visual slot calculation:", course);
+                            return; // Skip this course item if slot index is invalid
+                        }
+                        for (let i = 0; i < startVisualSlotIndex; i++) { topOffset += PERIOD_TIMES_DISPLAY[i].height; }
+                        courseItem.style.top = `${topOffset}px`;
+
+                        let courseCardHeight = 0;
+                        const endVisualSlotIndex = PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod];
+                        if (typeof endVisualSlotIndex === 'undefined') {
+                            console.warn("Invalid end period for course, skipping visual slot calculation:", course);
+                            return; // Skip this course item
+                        }
+                        for (let i = startVisualSlotIndex; i <= endVisualSlotIndex; i++) { courseCardHeight += PERIOD_TIMES_DISPLAY[i].height; }
+                        courseItem.style.height = `${courseCardHeight - 10}px`; // -10 for padding/margin
+
+                        const courseNameDiv = document.createElement('div'); courseNameDiv.classList.add('course-name'); courseNameDiv.textContent = course.name;
+                        const courseLocationDiv = document.createElement('div'); courseLocationDiv.classList.add('course-location'); courseLocationDiv.textContent = `📍 ${course.location}`;
+                        const courseTimeDiv = document.createElement('div'); courseTimeDiv.classList.add('course-time');
+                        
+                        const startTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.startPeriod]];
+                        const endTimeInfo = PERIOD_TIMES_DISPLAY[PERIOD_TO_DISPLAY_SLOT_INDEX[course.endPeriod]];
+                        let timeStr = `节次 ${course.startPeriod}-${course.endPeriod}`;
+                        if (startTimeInfo && endTimeInfo) {
+                            const actualStartT = startTimeInfo.time.split('-')[0];
+                            let actualEndT = endTimeInfo.time.split('-')[1];
+                            // Handle special case for 9-10 combined slot if needed, current logic uses its own end time
+                            if (course.startPeriod >=9 && course.endPeriod >=9 && course.startPeriod <= course.endPeriod) {
+                                // If it's a 9-10 slot, use its own end time which is correct.
+                                // If it was e.g. "9" and "10" as separate entries mapping to slot 8, this might need adjustment.
+                                // The current PERIOD_TIMES_DISPLAY for "9-10" is correct.
+                            }
+                            timeStr = `${actualStartT} - ${actualEndT}`;
+                        }
+                        courseTimeDiv.innerHTML = `🕘 ${timeStr}`;
+
+                        courseItem.appendChild(courseNameDiv); courseItem.appendChild(courseLocationDiv); courseItem.appendChild(courseTimeDiv);
+                        
+                        courseItem.addEventListener('mouseenter', (event) => {
+                            tooltipElement.textContent = `教师：${course.teacher || '未知'}`;
+                            const itemRect = courseItem.getBoundingClientRect();
+                            const tooltipRect = tooltipElement.getBoundingClientRect(); // Get current size
+                            let top = itemRect.top + window.scrollY;
+                            let left = itemRect.right + 8 + window.scrollX;
+
+                            // Tentatively set position to measure
+                            tooltipElement.style.left = '-9999px';
+                            tooltipElement.style.top = '-9999px';
+                            tooltipElement.classList.add('visible'); // Make it visible to measure
+                            const currentTooltipRect = tooltipElement.getBoundingClientRect(); // Measure after content set
+
+                            if (left + currentTooltipRect.width > window.innerWidth - 10) { // 10px buffer
+                                left = itemRect.left - currentTooltipRect.width - 8 + window.scrollX;
+                            }
+                            if (left < 10) left = 10; // Ensure not off-screen left
+
+                            if (itemRect.bottom + currentTooltipRect.height + 5 < window.innerHeight) {
+                                top = itemRect.bottom + 5 + window.scrollY; // Prefer below
+                            } else if (itemRect.top - currentTooltipRect.height - 5 > 0) {
+                                top = itemRect.top - currentTooltipRect.height - 5 + window.scrollY; // Place above
+                            } else { // Fallback to alongside, vertically centered with item
+                                top = itemRect.top + (itemRect.height / 2) - (currentTooltipRect.height / 2) + window.scrollY;
+                            }
+                            if (top < window.scrollY + 5) top = window.scrollY + 5; // Min top
+                            if (top + currentTooltipRect.height > window.scrollY + window.innerHeight - 5) {
+                                top = window.scrollY + window.innerHeight - 5 - currentTooltipRect.height; // Max bottom
+                            }
+
+                            tooltipElement.style.top = `${top}px`;
+                            tooltipElement.style.left = `${left}px`;
+                            // Already visible from measurement if class wasn't removed
+                        });
+                        courseItem.addEventListener('mouseleave', () => {
+                            tooltipElement.classList.remove('visible');
+                        });
+                        coursesGrid.appendChild(courseItem);
+                    });
+                } else {
+                    const noCourseMsgEl = document.createElement('p');
+                    noCourseMsgEl.classList.add('no-course-message');
+                    noCourseMsgEl.textContent = "今日无课";
+                    coursesGrid.appendChild(noCourseMsgEl);
+                }
+                dayColumn.appendChild(coursesGrid);
+                daysContainer.appendChild(dayColumn);
+            });
+
             setTimeout(() => {
                 const allDayColumns = daysContainer.querySelectorAll('.day-column');
                 allDayColumns.forEach((col, dayIdx) => {
@@ -391,10 +704,11 @@
                         item.classList.add('visible');
                     });
                 });
-            }, 150); // Start item animations shortly after main container starts its animation
+            }, 100); 
         }
         
         window.addEventListener('DOMContentLoaded', loadAndProcessDefaultFile);
     </script>
 </body>
 </html>
+
